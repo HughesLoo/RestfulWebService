@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="true" scanPeriod="60 seconds" debug="false">
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5relative %-5level %logger{80} [%thread] : %msg%n</pattern>
+        </encoder>
+        <target>System.out</target>
+    </appender>
+
+    <!--<appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>../../logs/mls-web-api.log</file>
+        <append>true</append>
+        <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+            <maxFileSize>200MB</maxFileSize>
+        </triggeringPolicy>
+        <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+            <maxIndex>10</maxIndex>
+            <FileNamePattern>../../logs/mls-web-api.log.%i</FileNamePattern>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %5level %logger{80} [%thread] : %msg%n</pattern>
+        </encoder>
+    </appender>-->
+
+    <appender name="ROLLING" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>DEBUG</level>
+        </filter>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>../../logs/mls-web-api.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %5level %logger{80} [%thread] : %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="ERROR" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>../../logs/mls-web-api-error.log</file>
+        <append>true</append>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>ERROR</level>
+        </filter>
+        <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+            <maxFileSize>250MB</maxFileSize>
+        </triggeringPolicy>
+        <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+            <maxIndex>10</maxIndex>
+            <FileNamePattern>../../logs/mls-web-api-error.log.%i</FileNamePattern>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %5level %logger{80} [%thread] : %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <!--<appender-ref ref="FILE"/>-->
+        <appender-ref ref="ROLLING"/>
+        <appender-ref ref="ERROR"/>
+    </root>
+
+    <logger name="org.springframework" level="INFO"/>
+    <logger name="org.apache.http" level="INFO"/>
+    <logger name="com.mchange.v2" level="INFO"/>
+    <logger name="org.hibernate.cfg" level="INFO"/>
+    <logger name="org.hibernate.id" level="INFO"/>
+    <logger name="org.hibernate.type" level="INFO"/>
+    <logger name="org.hibernate.loader" level="INFO"/>
+    <logger name="com.sun.jersey.server.wadl.generators" level="WARN"/>
+</configuration>
