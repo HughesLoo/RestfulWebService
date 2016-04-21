@@ -1,0 +1,252 @@
+# http://ci.openstack.org/jenkins-job-builder/
+- defaults:
+    name: local
+    desctiption: |
+      MLS WEB API Service
+    node: '{project.jenkins.node}'
+    jdk: '{project.jdk_version}'
+    project-type: freestyle
+    disabled: false
+    concurrent: false
+    block-downstream: false
+    block-upstream: true
+    logrotate:
+      daysToKeep: -1
+      numToKeep: 4
+      artifactDaysToKeep: -1
+      artifactNumToKeep: 2
+    scm:
+      - git:
+          url: '{project.repository.url}'
+          refspec: '+refs/heads/{branch}:refs/remotes/origin/{branch}'
+          branches:
+            - '{branch}'
+          wipe-workspace: False
+          skip-tag: True
+          local-branch: '{branch}'
+
+- job-group:
+    name: 'master_jobs'
+    jobs:
+        - '{name}_BUILD_{branch}'
+        - '{name}_RELEASE_{branch}'
+        - '{name}_CHECK_BOM_{branch}'
+        - '{name}_UPDATE_BOM_{branch}'
+#        - '{name}_CHECK_PROPERTY_{branch}'
+#        - '{name}_UPDATE_PROPERTY_{branch}'
+#        - '{name}_SONAR_{branch}'
+
+- job-group:
+    name: 'hotfix_jobs'
+    jobs:
+        - '{name}_BUILD_{branch}'
+
+- job-group:
+    name: 'feature_jobs'
+    jobs:
+        - '{name}_BUILD_{branch}'
+
+- job-template:
+    name: '{name}_BUILD_{branch}'
+    defaults: local
+
+    parameters:
+      - string:
+          name: PACKAGE_PATH
+          default: mls-web/api/{branch}
+          description: "The path of package"
+
+    builders:
+      - maven-target:
+          maven-version: '{project.maven_version}'
+          goals: clean install
+    publishers:
+      - ssh:
+          # name of the ssh site
+          site: Razor_MLS_Server
+          # destination directory
+          target: $PACKAGE_PATH
+          # source path specifier
+          source: 'target/*.zip'
+          # prefix to remove from uploaded file paths (optional)
+          remove-prefix: 'target'
+          # excluded file pattern (optional)
+          excludes: ''
+          # a command to execute on the remote server (optional)
+          command: ''
+          # un the exec command in pseudo TTY (default false)
+          use-pty: false
+          # timeout in milliseconds for the Exec command (optional)
+          timeout: 180000
+          # should the remote directory be deleted before transferring files (default false)
+          clean-remote: false
+          # fail the build if an error occurs (default false).
+          fail-on-error: true
+          # only create files on the server, don’t create directories (default false)
+          flatten: false
+      #- pipeline: '{name}_RELEASE_{branch}'
+      - email:
+          recipients: '{project.recipients}'
+          notify-every-unstable-build: true
+          send-to-individuals: false
+
+- job-template:
+    name: '{name}_RELEASE_{branch}'
+    defaults: local
+
+    wrappers:
+        - build-user-vars
+
+    builders:
+      - maven-target:
+          maven-version: '{project.maven_version}'
+          goals: sabre:check-user
+          properties:
+            - acl={project.acl_list}
+            - pwid=$BUILD_USER
+      - maven-target:
+          maven-version: '{project.maven_version}'
+          goals: -B release:clean release:prepare release:perform release:clean
+
+    publishers:
+      - email:
+          recipients: '{project.recipients}'
+          notify-every-unstable-build: true
+          send-to-individuals: false
+
+- job-template:
+    name: '{name}_CHECK_BOM_{branch}'
+    defaults: local
+
+    builders:
+      - maven-target:
+          maven-version: '{project.maven_version}'
+          goals: versions:update-parent
+          properties:
+            - allowSnapshots=true
+      - maven-target:
+          maven-version: '{project.maven_version}'
+          goals: clean integration-test -Dmaven.test.skip=true
+      - maven-target:
+          maven-version: '{project.maven_version}'
+          goals: versions:revert
+    publishers:
+      #- pipeline: '{name}_UPDATE_BOM_{branch}'
+      #- junit:
+      #    results: '**/target/surefire-reports/*.xml,**/target/failsafe-reports/*.xml'
+      - email:
+          recipients: '{project.recipients}'
+          notify-every-unstable-build: true
+          send-to-individuals: false
+
+- job-template:
+    name: '{name}_UPDATE_BOM_{branch}'
+    defaults: local
+
+    parameters:
+      - choice:
+          name: USE_SNAPSHOT
+          choices:
+            - "false"
+            - "true"
+          description: "Update to last snapshot version (and not release)"
+
+    wrappers:
+        - build-user-vars
+
+    builders:
+      - maven-target:
+          maven-version: '{project.maven_version}'
+          goals: sabre:update-parent
+          properties:
+            - allowSnapshots=$USE_SNAPSHOT
+            - acl={project.acl_list}
+            - pwid=$BUILD_USER
+    publishers:
+      - email:
+          recipients: '{project.recipients}'
+          notify-every-unstable-build: true
+          send-to-individuals: false
+
+- job-template:
+    name: '{name}_CHECK_PROPERTY_{branch}'
+    defaults: local
+
+    parameters:
+      - string:
+          name: NAME
+          description: "The property name to check"
+      - string:
+          name: VALUE
+          description: "The property value to check"
+
+    builders:
+      - maven-target:
+          maven-version: '{project.maven_version}'
+          goals: clean integration-test
+          properties:
+            - '$NAME=$VALUE'
+    publishers:
+      #- junit:
+      #    results: '**/target/surefire-reports/*.xml,**/target/failsafe-reports/*.xml'
+      - email:
+          recipients: '{project.recipients}'
+          notify-every-unstable-build: true
+          send-to-individuals: false
+
+- job-template:
+    name: '{name}_UPDATE_PROPERTY_{branch}'
+    defaults: local
+
+    parameters:
+      - string:
+          name: NAME
+          description: "The property to update"
+      - choice:
+          name: USE_SNAPSHOT
+          choices:
+            - "false"
+            - "true"
+          description: "Update to last snapshot version (and not release)"
+
+    wrappers:
+      - build-user-vars
+    builders:
+      - maven-target:
+          maven-version: '{project.maven_version}'
+          goals: sabre:update-properties
+          properties:
+            - allowSnapshots=$USE_SNAPSHOT
+            - pwid=$BUILD_USER
+            - acl={project.acl_list}
+            - commit=true
+            - includeProperties=$NAME
+    publishers:
+      #- pipeline: '{name}_CHECK_PROPERTY_{branch}'
+      - email:
+          recipients: '{project.recipients}'
+          notify-every-unstable-build: true
+          send-to-individuals: false
+
+- job-template:
+    name: '{name}_SONAR_{branch}'
+    defaults: local
+          
+    triggers:
+        # every day at 1:02 AM
+      - timed: "02 1 * * 2-6"
+      
+    builders:
+      - maven-target:
+          maven-version: '{project.maven_version}'
+          # skip tests failures
+          goals: clean install -Dmaven.test.failure.ignore=true -Djacoco.outputDir=$WORKSPACE/target -Pcoverage
+    publishers:
+      - sonar:
+            maven-version: '{project.maven_version}'
+            installationName: '{project.sonar_installation_name}'
+            additional-properties: -Djacoco.outputDir=$WORKSPACE/target -Pcoverage
+      - email:
+          recipients: '{project.recipients}'      
+          notify-every-unstable-build: true
+          send-to-individuals: false 
